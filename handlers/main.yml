@@ -1,0 +1,7 @@
+---
+# handlers file for apache.server
+- name: Apache | Restart
+  service:
+    name: "{{ apache[ ansible_os_family ]['service'] }}"
+    state: restarted
+  listen: "Restart Apache Server"

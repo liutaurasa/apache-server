@@ -1,0 +1,5 @@
+---
+- name: Install Apache
+  yum:
+    name: "{{ apache[ ansible_os_family ]['packages'] }}"
+    state: "{{ packages_state | default('present') }}"

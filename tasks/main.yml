@@ -1,0 +1,34 @@
+---
+# tasks file for apache.server
+- name: " Apache | Install |"
+  include_tasks: "{{ ansible_os_family }}_install.yml"
+
+- name: "Apache | Files and directories |"
+  include_tasks: "{{ ansible_os_family }}_files_dirs.yml"
+
+- name: "Apache | Prepare LetsEncrypt certificates |"
+  include_tasks: "{{ ansible_os_family }}_letsencrypt.yml"
+  when: apache_vhosts | selectattr('certificates', 'equalto', 'letsencrypt') | list | length > 0
+
+- name: "Apache | Vhosts configuration |"
+  template:
+    src: vhost.conf.j2
+    dest: "{{ apache[ ansible_os_family ]['vhosts_configs'] }}/{{ _vhost.name }}.conf"
+    mode: 644
+    owner: root
+    group: root
+  loop: "{{ apache_vhosts }}"
+  loop_control:
+    loop_var: _vhost
+
+- name: "Apache | Include vhost config dir |"
+  lineinfile:
+    path: "{{ apache[ ansible_os_family ]['config_file'] }}"
+    line: "IncludeOptional {{ apache[ ansible_os_family ]['vhosts_configs'] }}/*.conf"
+  notify: "Apache | Restart"
+
+- name: "Apache | Service |"
+  service:
+    name: "{{ apache[ ansible_os_family ]['service'] }}"
+    enabled: True
+    state: started

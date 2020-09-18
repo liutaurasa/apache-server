@@ -1,0 +1,39 @@
+---
+- name: Apache | Configure mod_ssl
+  template:
+    src: ssl.conf.j2
+    dest: "{{ apache[ ansible_os_family ]['server_root'] }}/conf.d/ssl.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Apache Server
+
+- name: Apache | vhosts configuration directory
+  file:
+    path: "{{ apache[ ansible_os_family ]['vhosts_configs'] }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Apache | vhosts data directory
+  file:
+    path: "{{ apache['vhosts_dir'] }}/{{ vhost.name }}/htdocs"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ apache_vhosts }}"
+  loop_control:
+    loop_var: vhost
+
+- name: Apache | vhosts logs directory
+  file:
+    path: "{{ apache['vhosts_dir'] }}/{{ vhost.name }}/logs"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ apache_vhosts }}"
+  loop_control:
+    loop_var: vhost
