@@ -19,3 +19,4 @@ apache:
     user: 'apache'
     vhosts_configs: '/etc/httpd/sites-conf.d'
     config_file: '/etc/httpd/conf/httpd.conf'
+    certbot_plugin: 'apache'

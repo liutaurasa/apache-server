@@ -71,8 +71,8 @@
     SSLProtocol all -SSLv2
     SSLCipherSuite ALL:!ADH:!EXPORT:!SSLv2:RC4+RSA:+HIGH:+MEDIUM:+LOW
 {% if _vhost.certificates == 'letsencrypt' %}
-    SSLCertificateFile {{ certbot_live_dir }}/{{ _vhost.name }}.crt
-    SSLCertificateKeyFile {{ certbot_live_dir }}/{{ _vhost.name }}.key
+    SSLCertificateFile {{ certbot_live_dir }}/{{ _vhost.name }}/cert.pem
+    SSLCertificateKeyFile {{ certbot_live_dir }}/{{ _vhost.name }}/privkey.pem
 {% else %}
     SSLCertificateFile {{ apache[ansible_os_family]['certs_dir'] }}/{{ _vhost.name }}.crt
     SSLCertificateKeyFile {{ apache[ansible_os_family]['private_dir'] }}/{{ _vhost.name }}.key

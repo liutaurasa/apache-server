@@ -7,12 +7,17 @@
   include_tasks: "{{ ansible_os_family }}_files_dirs.yml"
 
 - name: "Apache | Prepare LetsEncrypt certificates |"
-  include_tasks: "{{ ansible_os_family }}_letsencrypt.yml"
+  include_role:
+    name: letsencrypt-certbot
+  vars:
+    _domains: "{{ apache_vhosts | selectattr('certificates', 'equalto', 'letsencrypt') | list }}"
+    _webservice: "{{ apache[ ansible_os_family ]['service'] }}"
+    _certbot_plugin: "{{ apache[ ansible_os_family ]['certbot_plugin'] }}"
   when: apache_vhosts | selectattr('certificates', 'equalto', 'letsencrypt') | list | length > 0
 
 - name: "Apache | Vhosts configuration |"
   template:
-    src: vhost.conf.j2
+    src: "{{ _vhost.vhost_conf | default('vhost.conf.j2') }}"
     dest: "{{ apache[ ansible_os_family ]['vhosts_configs'] }}/{{ _vhost.name }}.conf"
     mode: 644
     owner: root
