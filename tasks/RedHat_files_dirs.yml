@@ -18,22 +18,33 @@
 
 - name: Apache | vhosts data directory
   file:
-    path: "{{ apache['vhosts_dir'] }}/{{ vhost.name }}/htdocs"
+    path: "{{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}"
     state: directory
-    owner: root
-    group: root
-    mode: '0755'
+    group: "{{ _vhost.group | default(apache[ansible_os_family]['group']) }}"
+    mode: '02755'
   loop: "{{ apache_vhosts }}"
   loop_control:
-    loop_var: vhost
+    loop_var: _vhost
 
 - name: Apache | vhosts logs directory
   file:
-    path: "{{ apache['vhosts_dir'] }}/{{ vhost.name }}/logs"
+    path: "{{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs'] | join('/')) }}"
     state: directory
     owner: root
     group: root
     mode: '0755'
   loop: "{{ apache_vhosts }}"
   loop_control:
-    loop_var: vhost
+    loop_var: _vhost
+
+- name: Apache | Logs directory
+  file:
+    src: "{{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs'] | join('/')) }}"
+    dest: "{{ [apache[ansible_os_family]['logs'], _vhost.name] | join('/') }}"
+    state: link
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ apache_vhosts }}"
+  loop_control:
+    loop_var: _vhost

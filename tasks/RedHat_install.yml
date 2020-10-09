@@ -1,5 +1,7 @@
 ---
 - name: Install Apache
   yum:
-    name: "{{ apache[ ansible_os_family ]['packages'] }}"
+    name: "{{ apache[ ansible_os_family ]['packages'] + apache_custom_packages | default([]) }}"
     state: "{{ packages_state | default('present') }}"
+  notify: "Apache | Restart"
+

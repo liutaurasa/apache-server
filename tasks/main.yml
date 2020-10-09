@@ -22,6 +22,7 @@
     mode: 644
     owner: root
     group: root
+  notify: "Apache | Restart"
   loop: "{{ apache_vhosts }}"
   loop_control:
     loop_var: _vhost

@@ -1,11 +1,11 @@
 <VirtualHost *:80>
     ServerName {{ _vhost.name }}
     ServerAlias www.{{ _vhost.name }}
-    DocumentRoot {{ _vhost.document_root | default(apache.vhosts_dir + '/' + _vhost.name + '/htdocs' ) }}
+    DocumentRoot {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}
     RemoteIPHeader X-Forwarded-For
 
-    ErrorLog "|/usr/sbin/rotatelogs -L /var/log/httpd/{{ _vhost.name }}-error_log -f -l /var/log/httpd/{{ _vhost.name }}-error_log.%Y-%m-%d 86400"
-    CustomLog "|/usr/sbin/rotatelogs -L /var/log/httpd/{{ _vhost.name }}-access_log -f -l /var/log/httpd/{{ _vhost.name }}-access_log.%Y-%m-%d 86400" combined
+    ErrorLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }}.%Y-%m-%d 86400"
+    CustomLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }}.%Y-%m-%d 86400" combined
 
 {% if _vhost.ssl_redirect | default(True) %}
     RewriteEngine On
@@ -13,7 +13,7 @@
     RewriteCond %{REQUEST_URI} !^\/\.well-known\/.*$
     RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
 {% else %}
-    <Directory {{ apache.vhosts_dir }}/{{ _vhost.name }}>
+    <Directory {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}>
        Options -Indexes +FollowSymLinks +MultiViews
        AllowOverride All
        Order allow,deny
@@ -53,18 +53,18 @@
     ServerName {{ _vhost.name }}
     ServerAlias www.{{ _vhost.name }}
     ServerAlias s4.sertekmedia.lt
-    DocumentRoot {{ _vhost.document_root | default(apache.vhosts_dir + '/' + _vhost.name + '/htdocs' ) }}
+    DocumentRoot {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}
     RemoteIPHeader X-Forwarded-For
 
-    <Directory {{ _vhost.document_root | default(apache.vhosts_dir + '/' + _vhost.name) }}>
+    <Directory {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}>
        Options Indexes FollowSymLinks MultiViews
        AllowOverride All
        Order allow,deny
        allow from all
     </Directory>
 
-    ErrorLog "|/usr/sbin/rotatelogs -L /var/log/httpd/{{ _vhost.name }}-error_log -f -l /var/log/httpd/{{ _vhost.name }}-error_log.%Y-%m-%d 86400"
-    CustomLog "|/usr/sbin/rotatelogs -L /var/log/httpd/{{ _vhost.name }}-access_log -f -l /var/log/httpd/{{ _vhost.name }}-access_log.%Y-%m-%d 86400" combined
+    ErrorLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }}.%Y-%m-%d 86400"
+    CustomLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }}.%Y-%m-%d 86400" combined
     # LogLevel rewrite:trace3
 
     SSLEngine On
