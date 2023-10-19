@@ -1,25 +1,15 @@
 ---
 # defaults file for apache.server
 certbot_live_dir: '/etc/letsencrypt/live'
-apache:
-  default_ssl_vhost: True
-  vhosts_dir: '/var/www/domains'
-  vhosts_htdocs: 'public'
-  RedHat:
-    certs_dir: '/etc/pki/tls/certs'
-    private_dir: '/etc/pki/tls/private'
-    document_root: '/var/www/html'
-    group: 'apache'
-    logs: '/var/log/httpd'
-    packages:
-      - httpd
-      - mod_ssl
-      - mod_php
-      - php-mysqlnd
-    server_root: '/etc/httpd'
-    service: 'httpd'
-    ssl_vhost: false
-    user: 'apache'
-    vhosts_configs: '/etc/httpd/sites-conf.d'
-    config_file: '/etc/httpd/conf/httpd.conf'
-    certbot_plugin: 'apache'
+
+apache_hosting_group: access
+
+apache_vhosts_htdocs: public
+
+apache_modules: []
+#  - name: mod_remoteip.c
+#    scope: global
+#    template: mod_remoteip.conf.j2
+#    config:
+#      RemoteIPHeader: X-Forwarded-For
+#      RemoteIPTrustedProxy: 172.16.2.192

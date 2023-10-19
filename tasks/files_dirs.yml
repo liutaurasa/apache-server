@@ -1,0 +1,123 @@
+---
+- name: Apache | Configure mod_ssl
+  template:
+    src: ssl.conf.j2
+    dest: "{{ apache[ ansible_os_family ]['server_root'] }}/conf.d/ssl.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Apache Server
+
+- name: Apache | vhosts configuration directory
+  file:
+    path: "{{ apache[ansible_os_family]['server_root'] }}/{{ apache[ ansible_os_family ]['vhosts_configs'] }}"
+    state: directory
+    owner: root
+    group: "{{ apache[ansible_os_family]['user'] }}"
+    seuser: unconfined_u
+    serole: object_r
+    setype: httpd_config_t
+    mode: '0750'
+
+- name: Apache | Vhost user home dirs ||
+  file:
+    path: "{{ _vhost['user_home'] | default('/home/' + _user) }}"
+    owner: "{{ _user }}"
+    group: "{{ apache_hosting_group }}"
+    mode: "0710"
+    seuser: unconfined_u
+    serole: object_r
+    setype: httpd_sys_content_t
+    state: directory
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+  when: apache_hosting
+
+- name: Apache | Symlink to web dir ||
+  file:
+    src: "{{ _vhost['document_root'] | default(apache['vhosts_dir'] + '/' +  _vhost['name']) }}"
+    path: "{{ [ _vhost['user_home'] | default('/home/' + _user), _vhost['name'] ] | join('/') }}"
+    owner: "{{ _user }}"
+    group: "{{ apache_hosting_group }}"
+    state: link
+    force: yes
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: apache_hosting
+
+- name: Apache | vhosts data directory (public)
+  file:
+    path: "{{ _vhost['document_root'] | default([apache['vhosts_dir'], _vhost['name'], apache_vhosts_htdocs] | join('/')) }}"
+    state: directory
+    owner: "{{ _user }}"
+    group: "{{ _vhost['group'] | default(_vhost['name'] | replace('.', '-') ) }}"
+    mode: "0751"
+    seuser: system_u
+    serole: object_r
+    setype: httpd_sys_content_t
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+
+- name: Apache | vhosts data directory (public/htdocs)
+  file:
+    path: "{{ _vhost['document_root'] | default([apache['vhosts_dir'], _vhost['name'], apache_vhosts_htdocs, 'htdocs'] | join('/')) }}"
+    state: directory
+    owner: "{{ _user }}"
+    group: "{{ _vhost['group'] | default(_vhost['name'] | replace('.', '-') ) }}"
+    mode: "0755"
+    seuser: system_u
+    serole: object_r
+    setype: httpd_sys_content_t
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+
+- name: Apache | vhosts logs directory
+  file:
+    path: "{{ _vhost['logs'] | default([apache['vhosts_dir'], _vhost['name'], 'logs'] | join('/')) }}"
+    state: directory
+    owner: root
+    group: "{{ apache[ansible_os_family]['group'] }}"
+    mode: '0775'
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+
+- name: Apache | Logs directory
+  file:
+    src: "{{ _vhost['logs'] | default([apache['vhosts_dir'], _vhost['name'], 'logs'] | join('/')) }}"
+    dest: "{{ [apache[ansible_os_family]['logs'], _vhost['name']] | join('/') }}"
+    state: link
+    serole: object_r
+    setype: httpd_log_t
+    seuser: system_u
+  ignore_errors: "{{ ansible_check_mode }}"
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"

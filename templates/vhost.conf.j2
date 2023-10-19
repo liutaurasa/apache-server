@@ -1,24 +1,55 @@
 <VirtualHost *:80>
     ServerName {{ _vhost.name }}
-    ServerAlias www.{{ _vhost.name }}
+{% for _alias in _vhost['aliases'] | default([_vhost['alias'] | default() ]) | select() %}
+    ServerAlias {{ _alias }}
+{% endfor %}
     DocumentRoot {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}
     RemoteIPHeader X-Forwarded-For
 
-    ErrorLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }}.%Y-%m-%d 86400"
-    CustomLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }}.%Y-%m-%d 86400" combined
+    <IfModule mod_setenvif.c>
+      SetEnvIf X-Forwarded-Proto "^https$" HTTPS
+    </IfModule>
 
-{% if _vhost.ssl_redirect | default(True) %}
+    ErrorLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'error_log'] | join('/')) }}.%Y-%m-%d 86400" {{ _vhost['error_log_format'] | default('') }}
+    CustomLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }}.%Y-%m-%d 86400" {{ _vhost['custom_log_format'] | default('combined') }}
+
+
+{% if _vhost['ssl_redirect'] | default(True) %}
     RewriteEngine On
     RewriteCond %{HTTPS} !=on
     RewriteCond %{REQUEST_URI} !^\/\.well-known\/.*$
     RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
 {% else %}
-    <Directory {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}>
-       Options -Indexes +FollowSymLinks +MultiViews
-       AllowOverride All
-       Order allow,deny
-       allow from all
+    <Directory {{ _vhost['document_root'] | default([apache['vhosts_dir'], _vhost['name'], apache['vhosts_htdocs'], 'htdocs'] | join('/')) }}>
+        Options -Indexes +FollowSymLinks +MultiViews
+        AllowOverride All
+        Order allow,deny
+        allow from all
+{%  if _vhost['php_admin_values'] is defined %}
+{%      for _value in _vhost['php_admin_values'] | dict2items %}
+        php_admin_value {{ _value['key'] }} {{ _value['value'] }}
+{%      endfor %}
+{%  endif %}
     </Directory>
+
+{% if _vhost.itk_mod.user is defined and _vhost.itk_mod.group is defined %}
+    <IfModule mpm_itk_module>
+        AssignUserId {{ _vhost.itk_mod.user }} {{ _vhost.itk_mod.group }}
+    </IfModule>
+{% endif %}
+
+{% if php_engine is defined and php_engine == 'php-fpm' %}
+    <IfModule !mod_php5.c>
+        <IfModule !mod_php7.c>
+            # Enable http authorization headers
+            SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+    
+            <FilesMatch \.(php|phar)$>
+                SetHandler "proxy:unix:/run/php-fpm/{{ _vhost['php_fpm']['pool_name'] | default('www') }}.sock|fcgi://localhost"
+            </FilesMatch>
+        </IfModule>
+    </IfModule>
+{% endif %}
 
     <IfModule mod_deflate.c>
       # Compress HTML, CSS, JavaScript, Text, XML and fonts
@@ -44,6 +75,7 @@
       AddOutputFilterByType DEFLATE text/plain
       AddOutputFilterByType DEFLATE text/xml
     </IfModule>
+
 {% endif %}
 
 </VirtualHost>
@@ -51,8 +83,9 @@
 {% if _vhost.certificates or _vhost.certificates == 'letsencrypt' %}
 <VirtualHost *:443>
     ServerName {{ _vhost.name }}
-    ServerAlias www.{{ _vhost.name }}
-    ServerAlias s4.sertekmedia.lt
+{% for _alias in _vhost['aliases'] | default([_vhost['alias'] | default() ]) | select() %}
+    ServerAlias {{ _alias }}
+{% endfor %}
     DocumentRoot {{ _vhost.document_root | default([apache.vhosts_dir, _vhost.name, apache.vhosts_htdocs, 'htdocs'] | join('/')) }}
     RemoteIPHeader X-Forwarded-For
 
@@ -67,15 +100,29 @@
     CustomLog "|/usr/sbin/rotatelogs -L {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }} -f -l {{ _vhost.logs | default([apache.vhosts_dir, _vhost.name, 'logs', 'access_log'] | join('/')) }}.%Y-%m-%d 86400" combined
     # LogLevel rewrite:trace3
 
+{% if _vhost.certificates == 'letsencrypt' %}
+    Include /etc/letsencrypt/options-ssl-apache.conf
+    SSLCertificateFile {{ certbot_live_dir }}/{{ _vhost.name }}/cert.pem
+    SSLCertificateKeyFile {{ certbot_live_dir }}/{{ _vhost.name }}/privkey.pem
+    SSLCertificateChainFile {{ certbot_live_dir }}/{{ _vhost.name }}/chain.pem
+{% else %}
     SSLEngine On
     SSLProtocol all -SSLv2
     SSLCipherSuite ALL:!ADH:!EXPORT:!SSLv2:RC4+RSA:+HIGH:+MEDIUM:+LOW
-{% if _vhost.certificates == 'letsencrypt' %}
-    SSLCertificateFile {{ certbot_live_dir }}/{{ _vhost.name }}/cert.pem
-    SSLCertificateKeyFile {{ certbot_live_dir }}/{{ _vhost.name }}/privkey.pem
-{% else %}
     SSLCertificateFile {{ apache[ansible_os_family]['certs_dir'] }}/{{ _vhost.name }}.crt
     SSLCertificateKeyFile {{ apache[ansible_os_family]['private_dir'] }}/{{ _vhost.name }}.key
+{% endif %}
+
+{% if _vhost['proxy'] is defined %}
+    ProxyRequests Off
+    ProxyPass           {{ _vhost['proxy']['path'] | default('/') }}        {{ _vhost['proxy']['destination'] }}
+    ProxyPassReverse    {{ _vhost['proxy']['path'] | default('/') }}        {{ _vhost['proxy']['destination'] }}
+{% endif %}
+
+{% if _vhost.itk_mod.user is defined and _vhost.itk_mod.group is defined %}
+    <IfModule mpm_itk_module>
+        AssignUserId {{ _vhost.itk_mod.user }} {{ _vhost.itk_mod.group }}
+    </IfModule>
 {% endif %}
 
     <IfModule mod_deflate.c>
@@ -102,6 +149,20 @@
       AddOutputFilterByType DEFLATE text/plain
       AddOutputFilterByType DEFLATE text/xml
     </IfModule>
+
+{% if php_engine is defined and php_engine == 'php-fpm' %}
+    <IfModule !mod_php5.c>
+        <IfModule !mod_php7.c>
+            # Enable http authorization headers
+            SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+            <FilesMatch \.(php|phar)$>
+                <If "-f %{REQUEST_FILENAME}">
+                    SetHandler "proxy:unix:/run/php-fpm/{{ _vhost['php_fpm']['pool_name'] }}.sock|fcgi://localhost"
+                </If>
+            </FilesMatch>
+        </IfModule>
+    </IfModule>
+{% endif %}
 
 </VirtualHost>
 {% endif %}

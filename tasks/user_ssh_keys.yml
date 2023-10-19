@@ -1,0 +1,17 @@
+---
+- name: Apache | Add ssh keys to user
+  authorized_key:
+    user: "{{ _user }}"
+    key: "{{ _pub_key }}"
+    state: present
+  loop: "{{ _ssh_pub_keys }}"
+  loop_control:
+    loop_var: _pub_key
+  vars:
+    _ssh_pub_keys: |
+      {% if _vhost['user']['ssh_pub_keys'] | default(_vhost['user']['ssh_pub_key']) is string %}
+      {{ [_vhost['user']['ssh_pub_keys'] | default(_vhost['user']['ssh_pub_key'])] }}
+      {% else %}
+      {{ _vhost['user']['ssh_pub_keys'] | default(_vhost['user']['ssh_pub_key']) }}
+      {% endif %}
+

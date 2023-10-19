@@ -1,0 +1,50 @@
+---
+- name: "Apache | Create group"
+  group:
+    name: "{{ apache_hosting_group }}"
+    state: present
+
+- name: "Apache | Modify user"
+  user:
+    name: "{{ apache[ansible_os_family]['user'] }}"
+    groups: "{{ apache_hosting_group }}"
+    append: False
+
+- name: "Apache | Vhost groups"
+  group:
+    name: "{{ _vhost['group'] | default(_vhost['name'] | replace('.', '-') ) }}"
+    state: present
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+
+- name: "Apache | Vhost user"
+  user:
+    name: "{{ _user }}"
+    group: "{{ _vhost['group'] | default(_vhost['name'] | replace('.', '-') ) }}"
+    home: "{{ _vhost['user_home'] | default('/home/' + _vhost['user']['name'] | default(_vhost['user']) ) }}"
+    create_home: True
+    comment: "{{ _vhost['comment'] | default('Apache vhost user') }}"
+    password: "{{ lookup('password', 'vaults/credentials/' + inventory_hostname + '/os/' + _user + '.pass', encrypt='sha512_crypt') }}"
+    state: present
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+
+- name: "Apache | Vhost user ssh authorized_keys"
+  include_tasks: user_ssh_keys.yml
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+    _user: "{{ _vhost['user']['name'] | default( _vhost['user'] | default(_vhost['name'] | replace('.', '-') ) ) }}"
+  when: _vhost['user']['ssh_pub_keys'] is defined or _vhost['user']['ssh_pub_key'] is defined

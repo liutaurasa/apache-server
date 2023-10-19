@@ -1,2 +1,23 @@
 ---
 # vars file for apache.server
+apache:
+  default_ssl_vhost: True
+  vhosts_dir: '/var/www/domains'
+  vhosts_htdocs: 'public'
+  RedHat:
+    certs_dir: '/etc/pki/tls/certs'
+    private_dir: '/etc/pki/tls/private'
+    document_root: '/var/www/html'
+    group: 'apache'
+    logs: '/var/log/httpd'
+    packages:
+      - httpd
+      - mod_ssl
+    server_root: "/etc/httpd"
+    service: "httpd"
+    ssl_vhost: false
+    user: 'apache'
+    vhosts_configs: "sites-conf.d"
+    modules_configs: "conf.d"
+    config_file: "conf/httpd.conf"
+    certbot_plugin: "apache"

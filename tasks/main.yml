@@ -2,9 +2,19 @@
 # tasks file for apache.server
 - name: " Apache | Install |"
   include_tasks: "{{ ansible_os_family }}_install.yml"
+  tags:
+    - apache
+
+- name: "Apache | Users and Groups |"
+  import_tasks: "users_groups.yml"
+  when: apache_hosting
+  tags:
+    - apache
 
 - name: "Apache | Files and directories |"
-  include_tasks: "{{ ansible_os_family }}_files_dirs.yml"
+  import_tasks: "files_dirs.yml"
+  tags:
+    - apache
 
 - name: "Apache | Prepare LetsEncrypt certificates |"
   include_role:
@@ -13,28 +23,71 @@
     _domains: "{{ apache_vhosts | selectattr('certificates', 'equalto', 'letsencrypt') | list }}"
     _webservice: "{{ apache[ ansible_os_family ]['service'] }}"
     _certbot_plugin: "{{ apache[ ansible_os_family ]['certbot_plugin'] }}"
-  when: apache_vhosts | selectattr('certificates', 'equalto', 'letsencrypt') | list | length > 0
+  when: apache_vhosts | selectattr('certificates', 'defined') | selectattr('certificates', 'equalto', 'letsencrypt') | list | length > 0
+  tags:
+    - apache
+    - letsencrypt
 
-- name: "Apache | Vhosts configuration |"
+- name: "Apache | Remove vhosts"
+  file:
+    dest: "{{ apache[ansible_os_family]['server_root'] }}/{{ apache[ ansible_os_family ]['vhosts_configs'] }}/{{ _vhost['name'] }}.conf"
+    state: absent
+  loop: "{{ _vhosts_absent }}"
+  loop_control:
+    loop_var: _vhost
+  vars:
+    _vhosts_absent: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'absent') | list }}"
+  tags:
+    - apache
+
+- name: "Apache | Global modules"
   template:
-    src: "{{ _vhost.vhost_conf | default('vhost.conf.j2') }}"
-    dest: "{{ apache[ ansible_os_family ]['vhosts_configs'] }}/{{ _vhost.name }}.conf"
-    mode: 644
+    src: "{{ _module['template'] | default(_module['name'] + '.j2') }}"
+    dest: "{{ apache[ansible_os_family]['server_root'] }}/{{ apache[ ansible_os_family ]['modules_configs'] }}/{{ _module['name'] | basename }}.conf"
+    mode: "0644"
     owner: root
     group: root
   notify: "Apache | Restart"
-  loop: "{{ apache_vhosts }}"
+  loop: "{{ _modules_present + _modules_no_state }}"
+  loop_control:
+    loop_var: _module
+  vars:
+    _modules_present: "{{ apache_modules | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _modules_no_state: "{{ apache_modules | selectattr('state', 'undefined') | list }}"
+  tags:
+    - apache
+  
+
+- name: "Apache | Vhosts configuration"
+  template:
+    src: "{{ _vhost['host_conf'] | default('vhost.conf.j2') }}"
+    dest: "{{ apache[ansible_os_family]['server_root'] }}/{{ apache[ ansible_os_family ]['vhosts_configs'] }}/{{ _vhost['name'] }}.conf"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: "Apache | Restart"
+  loop: "{{ _vhosts_present + _vhosts_no_state }}"
   loop_control:
     loop_var: _vhost
+  vars:
+    _vhosts_present: "{{ apache_vhosts | rejectattr('state', 'undefined') | selectattr('state', 'equalto', 'present') | list }}"
+    _vhosts_no_state: "{{ apache_vhosts | selectattr('state', 'undefined') | list }}"
+  tags:
+    - apache
 
 - name: "Apache | Include vhost config dir |"
   lineinfile:
-    path: "{{ apache[ ansible_os_family ]['config_file'] }}"
+    path: "{{ apache[ansible_os_family]['server_root'] }}/{{ apache[ ansible_os_family ]['config_file'] }}"
     line: "IncludeOptional {{ apache[ ansible_os_family ]['vhosts_configs'] }}/*.conf"
+  ignore_errors: "{{ ansible_check_mode }}"
   notify: "Apache | Restart"
+  tags:
+    - apache
 
-- name: "Apache | Service |"
+- name: "Apache | Service"
   service:
     name: "{{ apache[ ansible_os_family ]['service'] }}"
     enabled: True
     state: started
+  tags:
+    - apache
