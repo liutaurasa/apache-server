@@ -30,6 +30,7 @@
     comment: "{{ _vhost['comment'] | default('Apache vhost user') }}"
     password: "{{ lookup('password', 'vaults/credentials/' + inventory_hostname + '/os/' + _user + '.pass', encrypt='sha512_crypt') }}"
     state: present
+  ignore_errors: "{{ ansible_check_mode }}"
   loop: "{{ _vhosts_present + _vhosts_no_state }}"
   loop_control:
     loop_var: _vhost
@@ -40,6 +41,7 @@
 
 - name: "Apache | Vhost user ssh authorized_keys"
   include_tasks: user_ssh_keys.yml
+  ignore_errors: "{{ ansible_check_mode }}"
   loop: "{{ _vhosts_present + _vhosts_no_state }}"
   loop_control:
     loop_var: _vhost

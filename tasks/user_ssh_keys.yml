@@ -4,6 +4,7 @@
     user: "{{ _user }}"
     key: "{{ _pub_key }}"
     state: present
+  ignore_errors: "{{ ansible_check_mode }}"
   loop: "{{ _ssh_pub_keys }}"
   loop_control:
     loop_var: _pub_key
